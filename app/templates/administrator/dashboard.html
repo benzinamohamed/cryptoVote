@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="page-icon pi-admin"><i class="bi bi-shield-lock-fill"></i></div>
+    <div>
+      <h1>Admin Dashboard</h1>
+      <p>
+        {% if state.status == 'not_setup' %}Start an election and manage voter credentials
+        {% elif state.status == 'open' %}Election in progress · {{ ballots | length }}/{{ voters | length }} votes cast
+        {% elif state.status == 'closed' %}Election closed · Ready to count
+        {% elif state.status == 'counted' and not state.results_published %}Counting done · Publish when ready
+        {% elif state.status == 'counted' and state.results_published %}Results published
+        {% endif %}
+      </p>
+    </div>
+    <div style="margin-left:auto">
+      <a href="{{ url_for('administrator.logout') }}" class="btn btn-secondary btn-sm">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="page-content">
+
+{# ══════════════════ NOT SET UP ══════════════════ #}
+{% if state.status == 'not_setup' %}
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+  <div class="card">
+    <div class="card-header"><i class="bi bi-play-circle-fill accent-admin"></i> Start Election</div>
+    <div class="card-body">
+      <form method="post" action="{{ url_for('administrator.setup') }}">
+        <div class="form-group">
+          <label class="label" for="election_name">Election Name</label>
+          <input type="text" id="election_name" name="election_name" class="input"
+                 value="Cryptography Course Evaluation 2026" required>
+        </div>
+        <div class="form-group">
+          <label class="label" for="num_voters">
+            Number of Voters <span class="label-hint">(1–20)</span>
+          </label>
+          <input type="number" id="num_voters" name="num_voters" class="input"
+                 value="5" min="1" max="20" required>
+        </div>
+        <button type="submit" class="btn btn-admin btn-full btn-lg">
+          <i class="bi bi-play-circle-fill"></i> Initialise Election
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card" style="background:var(--bg-subtle)">
+    <div class="card-header"><i class="bi bi-info-circle"></i> What happens during setup</div>
+    <div class="card-body">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        {% for step, color in [
+          ('Each voter receives unique N₁ (authentication) and N₂ (ballot authenticity) codes', 'var(--c-voter)'),
+          ('N₁ codes are registered as valid authentication tokens', 'var(--c-commiss)'),
+          ('TTH(N₂) fingerprints are stored — N₂ stays secret with the voter', 'var(--c-counter)'),
+          ('Election is opened and voting can begin', 'var(--c-admin)'),
+        ] %}
+        <div style="display:flex;align-items:flex-start;gap:10px;font-size:.875rem">
+          <span style="width:22px;height:22px;border-radius:50%;background:{{ color }};color:#fff;
+                       display:flex;align-items:center;justify-content:center;
+                       font-size:.68rem;font-weight:700;flex-shrink:0;margin-top:1px">{{ loop.index }}</span>
+          <span>{{ step }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# ══════════════════ OPEN ══════════════════ #}
+{% elif state.status == 'open' %}
+
+{% if voters_created %}
+<div class="alert alert-success">
+  <i class="bi bi-check-circle-fill"></i>
+  <div>
+    <strong>Election started!</strong> Distribute the credentials below to voters — they will not be shown again.
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <div class="card-header">
+    <i class="bi bi-card-list accent-admin"></i> Voter Credentials
+    <span class="badge badge-info header-right">{{ voters_created | length }} voters</span>
+  </div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Voter</th>
+        <th>N₁ Code <span style="font-weight:400;text-transform:none;letter-spacing:0">(Authentication)</span></th>
+        <th>N₂ Code <span style="font-weight:400;text-transform:none;letter-spacing:0">(Ballot authenticity)</span></th>
+        <th>TTH(N₂)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in voters_created %}
+      <tr>
+        <td style="font-weight:700">{{ v.name }}</td>
+        <td><code style="color:var(--c-voter)">{{ v.n1 }}</code></td>
+        <td><code style="color:var(--c-admin)">{{ v.n2 }}</code></td>
+        <td><code style="color:var(--c-counter)">{{ v.fingerprint }}</code></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- Stats -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">
+  <div class="stat-card">
+    <div class="stat-label">Votes Cast</div>
+    <div class="stat-value accent-admin">{{ ballots | length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Total Voters</div>
+    <div class="stat-value">{{ voters | length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Remaining</div>
+    <div class="stat-value">{{ voters | length - ballots | length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Election</div>
+    <div style="font-size:.9rem;font-weight:600;margin-top:4px">{{ state.name }}</div>
+  </div>
+</div>
+
+<!-- Voter status -->
+<div class="card" style="margin-bottom:16px">
+  <div class="card-header">
+    <i class="bi bi-people accent-admin"></i> Voter Status
+  </div>
+  <table class="data-table">
+    <thead><tr><th>Voter</th><th>N₁ Code</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for v in voters %}
+      <tr>
+        <td style="font-weight:600">{{ v.name }}</td>
+        <td><code>{{ v.n1_code }}</code></td>
+        <td>
+          {% if v.has_voted %}
+            <span class="badge badge-success"><i class="bi bi-check"></i> Voted</span>
+          {% else %}
+            <span class="badge badge-warn">Pending</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Close election -->
+<div style="display:flex;gap:10px;align-items:center">
+  <form method="post" action="{{ url_for('administrator.close_election') }}">
+    <button type="submit" class="btn btn-secondary"
+            onclick="return confirm('Close the election? No more votes will be accepted.')">
+      <i class="bi bi-lock"></i> Close Election
+    </button>
+  </form>
+  <form method="post" action="{{ url_for('administrator.reset') }}">
+    <button type="submit" class="btn btn-danger"
+            onclick="return confirm('Reset ALL data? This cannot be undone.')">
+      <i class="bi bi-trash3"></i> Reset
+    </button>
+  </form>
+</div>
+
+{# ══════════════════ CLOSED ══════════════════ #}
+{% elif state.status == 'closed' %}
+
+<div class="alert alert-warning">
+  <i class="bi bi-lock-fill"></i>
+  <span>Election is closed. <strong>{{ ballots | length }}</strong> ballot(s) in the box, ready to be counted.</span>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">
+  <div class="stat-card">
+    <div class="stat-label">Ballots</div>
+    <div class="stat-value accent-admin">{{ ballots | length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Registered Voters</div>
+    <div class="stat-value">{{ voters | length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Election</div>
+    <div style="font-size:.9rem;font-weight:600;margin-top:4px">{{ state.name }}</div>
+  </div>
+</div>
+
+<div style="display:flex;gap:10px">
+  <form method="post" action="{{ url_for('administrator.count') }}">
+    <button type="submit" class="btn btn-admin btn-lg"
+            onclick="return confirm('Decrypt and tally all ballots?')">
+      <i class="bi bi-calculator-fill"></i> Count Ballots
+    </button>
+  </form>
+  <form method="post" action="{{ url_for('administrator.reset') }}">
+    <button type="submit" class="btn btn-danger"
+            onclick="return confirm('Reset ALL data?')">
+      <i class="bi bi-trash3"></i> Reset
+    </button>
+  </form>
+</div>
+
+{# ══════════════════ COUNTED ══════════════════ #}
+{% elif state.status == 'counted' %}
+
+<!-- Stats -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">
+  <div class="stat-card">
+    <div class="stat-label">Valid Votes</div>
+    <div class="stat-value accent-admin">{{ valid | length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Invalid</div>
+    <div class="stat-value" style="color:hsl(0,72%,51%)">{{ (counted | length) - (valid | length) }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Average Grade</div>
+    <div class="stat-value accent-counter">{{ avg if avg else '—' }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Status</div>
+    {% if state.results_published %}
+      <span class="badge badge-success" style="margin-top:8px">Published</span>
+    {% else %}
+      <span class="badge badge-warn" style="margin-top:8px">Not published</span>
+    {% endif %}
+  </div>
+</div>
+
+{% if not state.results_published %}
+<div class="alert alert-info" style="margin-bottom:16px">
+  <i class="bi bi-info-circle-fill"></i>
+  <span>Counting complete. Click <strong>Publish Results</strong> to make them visible to voters.</span>
+</div>
+{% endif %}
+
+<!-- Distribution -->
+{% if distribution %}
+<div class="card" style="margin-bottom:16px">
+  <div class="card-header"><i class="bi bi-bar-chart-fill accent-counter"></i> Grade Distribution</div>
+  <div class="card-body" style="display:grid;grid-template-columns:1fr auto;gap:32px;align-items:center">
+    <div>
+      {% set total = distribution | map(attribute=1) | sum %}
+      {% for grade, cnt in distribution %}
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <span style="font-size:.8rem;font-weight:700;min-width:72px;text-align:right">Grade {{ grade }}</span>
+        <div class="prog-bar-wrap" style="flex:1">
+          <div class="prog-bar" style="width:{{ [cnt/total*100, 4] | max }}%">{{ cnt }}</div>
+        </div>
+        <span class="text-muted text-sm" style="min-width:38px">{{ (cnt/total*100) | round | int }}%</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div style="text-align:center;padding:0 16px">
+      <div style="font-size:3rem;font-weight:800;color:var(--c-counter);line-height:1">{{ avg }}</div>
+      <div class="text-muted text-sm" style="margin-top:4px">Avg / 10</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- N2-vote pairs -->
+<div class="card" style="margin-bottom:16px">
+  <div class="card-header">
+    <i class="bi bi-eye accent-counter"></i> Ballot Details
+    <span class="badge badge-info header-right">{{ counted | length }}</span>
+  </div>
+  <table class="data-table">
+    <thead><tr><th>#</th><th>N₂ Code</th><th>Grade</th><th>Sig</th><th>N₂ valid</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for b in counted %}
+      <tr>
+        <td class="text-muted">{{ loop.index }}</td>
+        <td><code>{{ b.n2_code }}</code></td>
+        <td><strong style="color:var(--c-counter)">{{ b.vote_value }}</strong></td>
+        <td>
+          {% if b.sig_valid %}<i class="bi bi-check-circle-fill accent-admin"></i>
+          {% else %}<i class="bi bi-x-circle-fill" style="color:hsl(0,72%,51%)"></i>{% endif %}
+        </td>
+        <td>
+          {% if b.n2_valid %}<i class="bi bi-check-circle-fill accent-admin"></i>
+          {% else %}<i class="bi bi-x-circle-fill" style="color:hsl(0,72%,51%)"></i>{% endif %}
+        </td>
+        <td>
+          {% if b.is_valid %}<span class="badge badge-success">Valid</span>
+          {% else %}<span class="badge badge-danger">Invalid</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Actions -->
+<div style="display:flex;gap:10px">
+  {% if not state.results_published %}
+  <form method="post" action="{{ url_for('administrator.publish') }}">
+    <button type="submit" class="btn btn-admin btn-lg"
+            onclick="return confirm('Publish results? Voters will be able to see them.')">
+      <i class="bi bi-megaphone-fill"></i> Publish Results
+    </button>
+  </form>
+  {% else %}
+  <a href="{{ url_for('main.results') }}" class="btn btn-secondary btn-lg">
+    <i class="bi bi-bar-chart-fill"></i> View Public Results Page
+  </a>
+  {% endif %}
+  <form method="post" action="{{ url_for('administrator.reset') }}">
+    <button type="submit" class="btn btn-danger"
+            onclick="return confirm('Reset ALL data?')">
+      <i class="bi bi-trash3"></i> Reset
+    </button>
+  </form>
+</div>
+
+{% endif %}
+
+</div>
+{% endblock %}

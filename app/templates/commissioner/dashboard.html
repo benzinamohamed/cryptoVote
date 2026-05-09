@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Commissioner{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="page-icon pi-commiss"><i class="bi bi-clipboard2-check-fill"></i></div>
+    <div>
+      <h1>Commissioner</h1>
+      <p>Manages valid N₁ codes and N₂ fingerprints · Verifies voter eligibility</p>
+    </div>
+  </div>
+</div>
+
+<div class="page-content">
+
+  <!-- Stats -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px">
+    <div class="stat-card">
+      <div class="stat-label">Unused N₁ Codes</div>
+      <div class="stat-value accent-commiss">{{ n1_codes | selectattr('is_used','eq',False) | list | length }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Used N₁ Codes</div>
+      <div class="stat-value" style="color:hsl(0,72%,51%)">{{ n1_codes | selectattr('is_used','eq',True) | list | length }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">N₂ Fingerprints</div>
+      <div class="stat-value">{{ fingerprints | length }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Voters</div>
+      <div class="stat-value">{{ n1_codes | length }}</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
+
+    <!-- N1 codes -->
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-key-fill accent-commiss"></i> Valid N₁ Codes
+        <span class="badge badge-info header-right">{{ n1_codes | length }}</span>
+      </div>
+      <div style="max-height:380px;overflow-y:auto">
+        {% if n1_codes %}
+        <table class="data-table">
+          <thead><tr><th>#</th><th>N₁ Code</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for c in n1_codes %}
+            <tr>
+              <td class="text-muted">{{ loop.index }}</td>
+              <td><code>{{ c.code }}</code></td>
+              <td>
+                {% if c.is_used %}
+                  <span class="badge badge-danger">Used</span>
+                {% else %}
+                  <span class="badge badge-success">Valid</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div style="text-align:center;padding:40px;color:var(--text-muted)">No N₁ codes registered.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- N2 fingerprints -->
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-fingerprint accent-commiss"></i> N₂ Fingerprints — TTH(N₂)
+        <span class="badge badge-info header-right">{{ fingerprints | length }}</span>
+      </div>
+      <div style="max-height:380px;overflow-y:auto">
+        {% if fingerprints %}
+        <table class="data-table">
+          <thead><tr><th>#</th><th>Fingerprint</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for fp in fingerprints %}
+            <tr>
+              <td class="text-muted">{{ loop.index }}</td>
+              <td><code style="color:var(--c-commiss);font-weight:700">{{ fp.fingerprint }}</code></td>
+              <td>
+                {% if fp.is_used %}
+                  <span class="badge badge-danger">Used</span>
+                {% else %}
+                  <span class="badge badge-success">Valid</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div style="text-align:center;padding:40px;color:var(--text-muted)">No fingerprints registered.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- TTH explanation -->
+  <div class="card">
+    <div class="card-header"><i class="bi bi-info-circle accent-commiss"></i> How TTH(N₂) Fingerprints Work</div>
+    <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start">
+      <div>
+        <p class="text-sm text-muted mb-3" style="line-height:1.7">
+          The Commissioner only ever receives <strong>TTH(N₂)</strong> fingerprints — never the actual N₂ codes.
+          This is guaranteed by the <strong>pre-image resistance</strong> property of the hash function:
+          knowing TTH(N₂) it is computationally infeasible to reconstruct a valid N₂.
+          After fingerprints are computed, the N₂ list is <strong>destroyed</strong>.
+        </p>
+        <p class="text-sm text-muted mb-0" style="line-height:1.7">
+          This prevents the Commissioner from forging valid ballots, even though they
+          control which N₁ codes are accepted.
+        </p>
+      </div>
+      <div class="formula">
+        N₂ = "AF15GH258ZQP"<br><br>
+        TTH(N₂) = "OLTZ"<br><br>
+        Commissioner has:  TTH(N₂) = "OLTZ"<br>
+        Commissioner does NOT have: "AF15GH258ZQP"
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

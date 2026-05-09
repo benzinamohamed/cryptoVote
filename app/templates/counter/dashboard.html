@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}Counter{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="page-icon pi-counter"><i class="bi bi-calculator-fill"></i></div>
+    <div>
+      <h1>Counter</h1>
+      <p>Decrypts ballots · Verifies signatures · Tallies and publishes results</p>
+    </div>
+  </div>
+</div>
+
+<div class="page-content">
+
+  <!-- Stats -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px">
+    <div class="stat-card">
+      <div class="stat-label">Total Ballots</div>
+      <div class="stat-value accent-counter">{{ ballots | length }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Valid Votes</div>
+      <div class="stat-value" style="color:var(--c-admin)">{{ counted | selectattr('is_valid') | list | length }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Public Key e</div>
+      <div style="font-size:1.1rem;font-weight:700;font-family:monospace">{{ counter_e }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Modulus N</div>
+      <div style="font-size:1.1rem;font-weight:700;font-family:monospace">{{ counter_n }}</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:16px;margin-bottom:24px">
+
+    <!-- Key pair -->
+    <div class="card">
+      <div class="card-header"><i class="bi bi-key-fill accent-counter"></i> RSA Key Pair</div>
+      <div class="card-body">
+        <table style="width:100%;border-collapse:collapse;font-size:.875rem">
+          <tr><td class="text-muted" style="padding:8px 0;width:110px">Modulus N</td>
+              <td><code>{{ counter_n }}</code> <span class="text-muted text-sm">= 11 × 53</span></td></tr>
+          <tr><td class="text-muted" style="padding:8px 0">Public key e</td>
+              <td><code style="color:var(--c-counter)">{{ counter_e }}</code></td></tr>
+          <tr><td class="text-muted" style="padding:8px 0">Private key d</td>
+              <td><code style="color:hsl(0,72%,51%)">{{ counter_d }}</code></td></tr>
+          <tr><td class="text-muted" style="padding:8px 0">φ(N)</td>
+              <td><code>520</code> <span class="text-muted text-sm">= (11-1)(53-1)</span></td></tr>
+        </table>
+        <div class="formula mt-3">3 × 347 = 1041 = 2 × 520 + 1 ≡ 1 (mod 520) ✓</div>
+      </div>
+    </div>
+
+    <!-- Counting action -->
+    <div class="card">
+      <div class="card-header"><i class="bi bi-play-circle accent-counter"></i> Counting</div>
+      <div class="card-body">
+        <p class="text-sm text-muted mb-3">For each ballot in the box the Counter:</p>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
+          {% for label, formula, color in [
+            ('Decrypt',    'C^d (mod N) → recovers vote',      'var(--c-counter)'),
+            ('Verify sig', 's^e ≡ m (mod N_admin)',             'var(--c-admin)'),
+            ('Verify N₂',  'Commissioner checks TTH(N₂)',       'var(--c-commiss)'),
+            ('Count',      'Both checks pass → vote tallied',   'var(--c-anon)'),
+          ] %}
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="width:26px;height:26px;border-radius:50%;background:var(--bg-muted);
+                         display:flex;align-items:center;justify-content:center;
+                         font-size:.68rem;font-weight:700;color:{{ color }};flex-shrink:0">
+              {{ loop.index }}
+            </span>
+            <div>
+              <span style="font-size:.85rem;font-weight:600">{{ label }}</span>
+              <code style="font-size:.78rem;margin-left:8px">{{ formula }}</code>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        {% if state.status == 'closed' %}
+        <form action="{{ url_for('counter.count') }}" method="post">
+          <button type="submit" class="btn btn-counter btn-full"
+                  onclick="return confirm('Decrypt and tally all ballots? This cannot be undone.')">
+            <i class="bi bi-calculator"></i> Count All Ballots
+          </button>
+        </form>
+
+        {% elif state.status == 'counted' %}
+          {% if not state.results_published %}
+          <div class="alert alert-info" style="margin-bottom:12px">
+            <i class="bi bi-check-circle-fill"></i>
+            <span>Counting complete. <strong>{{ counted | selectattr('is_valid') | list | length }}</strong> valid votes.</span>
+          </div>
+          <form action="{{ url_for('counter.publish') }}" method="post">
+            <button type="submit" class="btn btn-counter btn-full"
+                    onclick="return confirm('Publish results? Voters will be able to see them.')">
+              <i class="bi bi-megaphone-fill"></i> Publish Results
+            </button>
+          </form>
+          {% else %}
+          <div class="alert alert-success">
+            <i class="bi bi-check-circle-fill"></i>
+            <span>Results published. <a href="{{ url_for('main.results') }}" style="color:inherit;font-weight:600">View results →</a></span>
+          </div>
+          {% endif %}
+
+        {% else %}
+        <div class="alert alert-warning" style="margin-bottom:0">
+          <i class="bi bi-info-circle"></i>
+          <span>Election must be <strong>closed</strong> before counting (current: <strong>{{ state.status }}</strong>).</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Grade distribution -->
+  {% if distribution %}
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header"><i class="bi bi-bar-chart-fill accent-counter"></i> Grade Distribution</div>
+    <div class="card-body" style="display:grid;grid-template-columns:1fr auto;gap:32px;align-items:center">
+      <div>
+        {% set total = distribution | map(attribute=1) | sum %}
+        {% for grade, cnt in distribution %}
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+          <span style="font-size:.8rem;font-weight:700;min-width:70px;text-align:right">Grade {{ grade }}</span>
+          <div class="prog-bar-wrap" style="flex:1">
+            <div class="prog-bar" style="width:{{ [cnt/total*100, 4] | max }}%">{{ cnt }}</div>
+          </div>
+          <span class="text-muted text-sm" style="min-width:38px">{{ (cnt/total*100) | round | int }}%</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div style="text-align:center;padding:0 16px">
+        <div style="font-size:3rem;font-weight:800;color:var(--c-counter);line-height:1">{{ avg }}</div>
+        <div class="text-muted text-sm" style="margin-top:4px">Average / 10</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Ballot verification table -->
+  {% if ballots %}
+  <div class="card">
+    <div class="card-header">
+      <i class="bi bi-table accent-counter"></i> Ballot Verification Detail
+      <span class="badge badge-info header-right">{{ ballots | length }}</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>C (encrypted)</th>
+            <th>Decrypted</th>
+            <th>Sig valid</th>
+            <th>N₂ valid</th>
+            <th>Grade</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in ballots %}
+          <tr>
+            <td class="text-muted">{{ b.id }}</td>
+            <td><code style="color:var(--c-anon)">{{ b.encrypted_vote }}</code></td>
+            <td>
+              {% if b.is_counted %}
+                <code>{{ (b.encrypted_vote ** counter_d) % counter_n }}</code>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if b.is_counted %}
+                {% if b.sig_verified %}
+                  <i class="bi bi-check-circle-fill accent-admin"></i>
+                {% else %}
+                  <i class="bi bi-x-circle-fill" style="color:hsl(0,72%,51%)"></i>
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if b.is_counted %}
+                {% if b.n2_verified %}
+                  <i class="bi bi-check-circle-fill accent-admin"></i>
+                {% else %}
+                  <i class="bi bi-x-circle-fill" style="color:hsl(0,72%,51%)"></i>
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if b.is_valid %}
+                <strong style="color:var(--c-counter)">{{ b.vote_value }}</strong>
+              {% elif b.is_counted %}
+                <span style="color:hsl(0,72%,51%)">invalid</span>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

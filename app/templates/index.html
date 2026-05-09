@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Electronic Voting — ENSTA Alger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+<div class="landing-page">
+
+  <nav class="landing-nav">
+    <span class="navbar-brand" style="pointer-events:none">
+      <span class="brand-icon"><i class="bi bi-shield-lock-fill"></i></span>
+      E-Voting
+    </span>
+    <span class="status-badge {{ state.status if state else 'not_setup' }}">
+      <span class="dot"></span>
+      {{ (state.status if state else 'not setup') | upper | replace('_', ' ') }}
+    </span>
+  </nav>
+
+  <div class="landing-hero">
+    <div class="landing-eyebrow">
+      <i class="bi bi-mortarboard-fill"></i>
+      ENSTA Alger · Third Year Engineering · AI &amp; SS
+    </div>
+    <h1 class="landing-title">
+      Cryptography Applied to<br>Electronic Voting
+    </h1>
+    <p class="landing-subtitle">
+      A complete implementation of the blind-signature electronic voting protocol
+      using RSA, digital signatures, and the Toy Tetragraph Hash.
+    </p>
+    {% if state and state.status == 'open' %}
+    <div class="election-info">
+      <i class="bi bi-calendar3"></i>
+      <span>{{ state.name }}</span>
+      <span style="color:hsl(142,70%,30%);font-weight:600">
+        · {{ n1_used }}/{{ n1_total }} votes cast
+      </span>
+    </div>
+    {% elif state and state.status not in ['not_setup'] %}
+    <div class="election-info">
+      <i class="bi bi-calendar3"></i>
+      <span>{{ state.name }}</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="roles-section">
+    <div class="roles-grid" style="max-width:600px;margin:0 auto;grid-template-columns:1fr 1fr">
+
+      <a href="{{ url_for('voter.index') }}" class="role-card voter-card">
+        <div class="role-icon voter"><i class="bi bi-person-check-fill"></i></div>
+        <div class="role-name">Voter</div>
+        <div class="role-desc">Enter your credentials and cast your anonymous ballot.</div>
+        <div class="role-cta">Vote now <i class="bi bi-arrow-right"></i></div>
+      </a>
+
+      <a href="{{ url_for('administrator.dashboard') }}" class="role-card admin-card">
+        <span class="protected-tag"><i class="bi bi-lock-fill"></i> Protected</span>
+        <div class="role-icon admin"><i class="bi bi-shield-lock-fill"></i></div>
+        <div class="role-name">Admin</div>
+        <div class="role-desc">Manage the election — start, monitor, count, and publish results.</div>
+        <div class="role-cta">Login required <i class="bi bi-arrow-right"></i></div>
+      </a>
+
+    </div>
+
+    {% if state and state.results_published %}
+    <div style="text-align:center;margin-top:20px">
+      <a href="{{ url_for('main.results') }}" class="btn btn-counter">
+        <i class="bi bi-bar-chart-fill"></i> View Published Results
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="footer" style="margin-top:0">
+    Cryptography Applied to Electronic Voting · ENSTA Alger · Mrs. Souad KHERROUBI · 2026
+  </div>
+
+</div>
+</body>
+</html>

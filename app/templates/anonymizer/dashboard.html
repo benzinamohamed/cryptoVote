@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Anonymizer{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="page-icon pi-anon"><i class="bi bi-incognito"></i></div>
+    <div>
+      <h1>Anonymizer</h1>
+      <p>Receives encrypted ballots into the ballot box · Prevents double voting</p>
+    </div>
+  </div>
+</div>
+
+<div class="page-content">
+
+  <!-- Stats -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px">
+    <div class="stat-card">
+      <div class="stat-label">Ballots Received</div>
+      <div class="stat-value accent-anon">{{ ballots | length }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Counted</div>
+      <div class="stat-value" style="color:var(--c-admin)">{{ ballots | selectattr('is_counted') | list | length }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pending Count</div>
+      <div class="stat-value">{{ ballots | rejectattr('is_counted') | list | length }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Encrypted</div>
+      <div class="stat-value" style="color:var(--c-anon)">All</div>
+    </div>
+  </div>
+
+  {% if state.status in ['closed', 'counted'] %}
+  <div class="alert alert-warning">
+    <i class="bi bi-lock-fill"></i>
+    <span>
+      Election is <strong>{{ state.status }}</strong>. No further ballots are accepted.
+      {% if state.status == 'closed' %}
+      The <a href="{{ url_for('counter.dashboard') }}" style="color:inherit;font-weight:600">Counter</a>
+      can now decrypt and tally the results.
+      {% endif %}
+    </span>
+  </div>
+  {% endif %}
+
+  <!-- Ballot box -->
+  <div class="card">
+    <div class="card-header">
+      <i class="bi bi-inbox-fill accent-anon"></i> Ballot Box (Encrypted)
+      <span class="badge badge-info header-right">{{ ballots | length }} ballot{{ 's' if ballots | length != 1 else '' }}</span>
+    </div>
+    {% if ballots %}
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Encrypted Vote C</th>
+            <th>Admin Signature s</th>
+            <th>N₂ Code</th>
+            <th>Received</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in ballots %}
+          <tr>
+            <td class="text-muted">{{ b.id }}</td>
+            <td><code style="color:var(--c-anon);font-weight:700">{{ b.encrypted_vote }}</code></td>
+            <td><code>{{ b.admin_signature }}</code></td>
+            <td><code>{{ b.n2_code }}</code></td>
+            <td class="text-muted">{{ b.timestamp.strftime('%H:%M:%S') }}</td>
+            <td>
+              {% if b.is_counted %}
+                <span class="badge badge-success">Counted</span>
+              {% else %}
+                <span class="badge badge-warn">Pending</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:56px 20px;color:var(--text-muted)">
+      <i class="bi bi-inbox" style="font-size:2.5rem;display:block;margin-bottom:12px;opacity:.3"></i>
+      <p class="text-sm">Ballot box is empty. Waiting for votes.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- How it works -->
+  <div class="card" style="margin-top:16px">
+    <div class="card-header"><i class="bi bi-info-circle accent-anon"></i> Anonymizer Role</div>
+    <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start">
+      <div>
+        <p class="text-sm text-muted mb-3" style="line-height:1.7">
+          The Anonymizer receives <strong>encrypted</strong> ballots and stores them in the ballot box.
+          Before accepting a ballot, it verifies with the <strong>Commissioner</strong> that the N₁ code
+          has not been used — preventing double voting.
+        </p>
+        <p class="text-sm text-muted" style="line-height:1.7">
+          The Anonymizer only ever sees the encrypted vote — it cannot read the vote content.
+          It also verifies the <strong>admin blind signature</strong> to ensure ballots are authentic.
+        </p>
+      </div>
+      <div class="formula">
+        Voter sends: (C, s, N₂)<br><br>
+        C = vote^e_counter (mod N_counter)<br>
+        s = unblinded admin signature<br><br>
+        Checks: s^e_admin ≡ m (mod N_admin)<br>
+        Checks: N₁ not already used
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

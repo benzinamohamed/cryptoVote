@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Setup Election{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="page-icon" style="background:hsl(38,92%,93%);color:var(--c-anon)">
+      <i class="bi bi-gear-fill"></i>
+    </div>
+    <div>
+      <h1>Election Setup</h1>
+      <p>Initialise the election, generate voter credentials, and open the ballot</p>
+    </div>
+  </div>
+</div>
+
+<div class="page-content">
+
+{% if voters_created %}
+<!-- Success -->
+<div class="alert alert-success" style="margin-bottom:20px">
+  <i class="bi bi-check-circle-fill"></i>
+  <div>
+    <strong>Election initialised successfully!</strong><br>
+    <span class="text-sm">Distribute the credentials below to voters securely. They will not be shown again.</span>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:20px">
+  <div class="card-header">
+    <i class="bi bi-card-list accent-commiss"></i> Voter Credentials
+    <span class="badge badge-info header-right">{{ voters_created | length }} voters</span>
+  </div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Voter</th>
+        <th>N₁ Code <span style="font-weight:400;text-transform:none;letter-spacing:0">(Authentication)</span></th>
+        <th>N₂ Code <span style="font-weight:400;text-transform:none;letter-spacing:0">(Ballot authenticity)</span></th>
+        <th>TTH(N₂) <span style="font-weight:400;text-transform:none;letter-spacing:0">(Commissioner fingerprint)</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in voters_created %}
+      <tr>
+        <td style="font-weight:700">{{ v.name }}</td>
+        <td><code style="color:var(--c-commiss)">{{ v.n1 }}</code></td>
+        <td><code style="color:var(--c-admin)">{{ v.n2 }}</code></td>
+        <td><code style="color:var(--c-counter)">{{ v.fingerprint }}</code></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+  <a href="{{ url_for('voter.index') }}" class="btn btn-voter">
+    <i class="bi bi-person-check-fill"></i> Go to Voter Portal
+  </a>
+  <a href="{{ url_for('main.index') }}" class="btn btn-secondary">
+    <i class="bi bi-house"></i> Back to Home
+  </a>
+</div>
+
+{% elif state and state.status != 'not_setup' %}
+<div class="alert alert-info">
+  <i class="bi bi-info-circle-fill"></i>
+  <span>
+    Election already set up (status: <strong>{{ state.status }}</strong>).
+    <a href="{{ url_for('main.index') }}" style="color:inherit;font-weight:600">Return to home →</a>
+  </span>
+</div>
+
+{% else %}
+<!-- Setup form -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+  <div class="card">
+    <div class="card-header"><i class="bi bi-sliders accent-anon"></i> Configuration</div>
+    <div class="card-body">
+      <form method="post" action="{{ url_for('main.setup') }}">
+        <div class="form-group">
+          <label class="label" for="election_name">Election Name</label>
+          <input type="text" id="election_name" name="election_name" class="input"
+                 value="Cryptography Course Evaluation 2026" required>
+        </div>
+        <div class="form-group">
+          <label class="label" for="num_voters">
+            Number of Voters
+            <span class="label-hint">(1–20)</span>
+          </label>
+          <input type="number" id="num_voters" name="num_voters" class="input"
+                 value="5" min="1" max="20" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full btn-lg">
+          <i class="bi bi-play-circle-fill"></i> Initialise Election
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card" style="background:var(--bg-subtle)">
+    <div class="card-header"><i class="bi bi-info-circle"></i> What happens during setup?</div>
+    <div class="card-body">
+      <div class="step-list">
+        {% for step in [
+          ('Each voter receives two random 12-character alphanumeric codes: N₁ and N₂', 'var(--c-voter)'),
+          ('N₁ codes are registered with the Commissioner as valid authentication tokens', 'var(--c-commiss)'),
+          ('TTH(N₂) fingerprints are computed; the Commissioner receives fingerprints, voters keep N₂', 'var(--c-counter)'),
+          ('The election is opened — voting can begin', 'var(--c-admin)'),
+        ] %}
+        <div style="display:flex;align-items:flex-start;gap:10px;font-size:.875rem">
+          <span style="width:22px;height:22px;border-radius:50%;background:{{ step[1] }};color:#fff;
+                       display:flex;align-items:center;justify-content:center;
+                       font-size:.68rem;font-weight:700;flex-shrink:0;margin-top:1px">
+            {{ loop.index }}
+          </span>
+          <span>{{ step[0] }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="formula mt-4">
+        N₁ → Commissioner (valid codes list)<br>
+        N₂ → Voter (kept secret)<br>
+        TTH(N₂) → Commissioner (fingerprints)<br>
+        N₂ list is then destroyed
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endif %}
+
+</div>
+{% endblock %}

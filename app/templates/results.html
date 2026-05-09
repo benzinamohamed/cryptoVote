@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Results{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="page-icon pi-counter"><i class="bi bi-bar-chart-fill"></i></div>
+    <div>
+      <h1>Election Results</h1>
+      <p>Published by the Counter · Voters can verify their N₂ appears with the correct grade</p>
+    </div>
+  </div>
+</div>
+
+<div class="page-content">
+
+{% if not state or state.status == 'not_setup' %}
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle-fill"></i>
+  <span>No election has been set up. <a href="{{ url_for('main.setup') }}" style="color:inherit;font-weight:600">Set up an election →</a></span>
+</div>
+
+{% elif state.status == 'open' %}
+<div class="alert alert-info">
+  <i class="bi bi-info-circle-fill"></i>
+  <span>The election is still <strong>open</strong>. Results will be available after voting closes and ballots are counted.</span>
+</div>
+
+{% elif state.status == 'closed' %}
+<div class="alert alert-warning">
+  <i class="bi bi-lock-fill"></i>
+  <span>
+    Election is closed. The <a href="{{ url_for('counter.dashboard') }}" style="color:inherit;font-weight:600">Counter</a>
+    must tally the ballots first.
+  </span>
+</div>
+
+{% elif state.status == 'counted' and not state.results_published %}
+<div style="text-align:center;padding:80px 20px">
+  <i class="bi bi-hourglass-split" style="font-size:3rem;color:var(--text-light);display:block;margin-bottom:16px"></i>
+  <h2 style="font-size:1.25rem;font-weight:700;margin-bottom:8px">Waiting for Results to be Published</h2>
+  <p class="text-muted text-sm" style="max-width:400px;margin:0 auto 24px;line-height:1.7">
+    Counting is complete. The Counter must publish the results before they become visible here.
+  </p>
+  <a href="{{ url_for('counter.dashboard') }}" class="btn btn-counter">
+    <i class="bi bi-calculator-fill"></i> Go to Counter Dashboard
+  </a>
+</div>
+
+{% else %}
+<!-- Results are published -->
+
+<div style="display:grid;grid-template-columns:1fr auto;gap:16px;margin-bottom:24px;align-items:start">
+
+  <!-- Distribution -->
+  <div class="card">
+    <div class="card-header"><i class="bi bi-bar-chart-fill accent-counter"></i> Grade Distribution</div>
+    <div class="card-body">
+      {% if distribution %}
+        {% set total = valid | length %}
+        {% for grade, cnt in distribution %}
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <span style="font-size:.8rem;font-weight:700;min-width:72px;text-align:right">{{ grade }} / 10</span>
+          <div class="prog-bar-wrap" style="flex:1">
+            <div class="prog-bar" style="width:{{ [cnt/total*100, 4] | max }}%">
+              {{ cnt }} vote{{ 's' if cnt > 1 else '' }}
+            </div>
+          </div>
+          <span class="text-muted text-sm" style="min-width:38px">{{ (cnt/total*100) | round | int }}%</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="text-muted text-sm">No valid votes found.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="card" style="min-width:220px;text-align:center">
+    <div class="card-body" style="padding:32px 28px">
+      <div style="font-size:4rem;font-weight:800;color:var(--c-counter);letter-spacing:-.04em;line-height:1">{{ avg }}</div>
+      <div class="text-muted text-sm" style="margin:8px 0 24px">Average Grade / 10</div>
+      <div class="divider"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:16px">
+        <div>
+          <div style="font-size:1.5rem;font-weight:800;color:var(--c-admin)">{{ valid | length }}</div>
+          <div class="text-muted text-sm">Valid</div>
+        </div>
+        <div>
+          <div style="font-size:1.5rem;font-weight:800;color:hsl(0,72%,51%)">{{ (counted | length) - (valid | length) }}</div>
+          <div class="text-muted text-sm">Invalid</div>
+        </div>
+        <div>
+          <div style="font-size:1.5rem;font-weight:800">{{ counted | length }}</div>
+          <div class="text-muted text-sm">Total</div>
+        </div>
+      </div>
+    </div>
+    {% if state.published_at %}
+    <div class="card-footer" style="text-align:center">
+      Published {{ state.published_at.strftime('%Y-%m-%d %H:%M') }}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- N₂–Vote pairs -->
+<div class="card">
+  <div class="card-header">
+    <i class="bi bi-eye accent-counter"></i> Published N₂–Vote Pairs
+    <span class="text-muted text-sm" style="font-weight:400;margin-left:6px">— verify your vote was counted</span>
+    <span class="badge badge-info header-right">{{ counted | length }}</span>
+  </div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>N₂ Code</th>
+        <th>Grade</th>
+        <th>Sig valid</th>
+        <th>N₂ valid</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in counted %}
+      <tr>
+        <td class="text-muted">{{ loop.index }}</td>
+        <td><code>{{ b.n2_code }}</code></td>
+        <td><strong style="color:var(--c-counter)">{{ b.vote_value }}</strong></td>
+        <td>
+          {% if b.sig_valid %}
+            <i class="bi bi-check-circle-fill accent-admin"></i>
+          {% else %}
+            <i class="bi bi-x-circle-fill" style="color:hsl(0,72%,51%)"></i>
+          {% endif %}
+        </td>
+        <td>
+          {% if b.n2_valid %}
+            <i class="bi bi-check-circle-fill accent-admin"></i>
+          {% else %}
+            <i class="bi bi-x-circle-fill" style="color:hsl(0,72%,51%)"></i>
+          {% endif %}
+        </td>
+        <td>
+          {% if b.is_valid %}
+            <span class="badge badge-success">Valid</span>
+          {% else %}
+            <span class="badge badge-danger">Invalid</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="card-footer">
+    Each voter can look up their own N₂ code to verify their vote was correctly counted.
+    Without knowing a voter's N₂, it is impossible to link a row to a specific person.
+  </div>
+</div>
+
+{% endif %}
+
+</div>
+{% endblock %}
