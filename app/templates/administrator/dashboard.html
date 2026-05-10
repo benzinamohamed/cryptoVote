@@ -98,7 +98,6 @@
       <tr>
         <th>Voter</th>
         <th>N₁ Code <span style="font-weight:400;text-transform:none;letter-spacing:0">(Authentication)</span></th>
-        <th>N₂ Code <span style="font-weight:400;text-transform:none;letter-spacing:0">(Ballot authenticity)</span></th>
         <th>TTH(N₂)</th>
       </tr>
     </thead>
@@ -107,7 +106,6 @@
       <tr>
         <td style="font-weight:700">{{ v.name }}</td>
         <td><code style="color:var(--c-voter)">{{ v.n1 }}</code></td>
-        <td><code style="color:var(--c-admin)">{{ v.n2 }}</code></td>
         <td><code style="color:var(--c-counter)">{{ v.fingerprint }}</code></td>
       </tr>
       {% endfor %}
